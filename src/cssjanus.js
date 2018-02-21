@@ -91,7 +91,7 @@ function Tokenizer( regex, token ) {
  */
 function CSSJanus() {
 
-	var
+	const
 		sides = [ 'top', 'right', 'bottom', 'left' ],
 		cursors = [ 'n', 'e', 's', 'w' ],
 		wmDirs = [ 'tb', 'rl', 'bt', 'lr' ],
@@ -113,9 +113,9 @@ function CSSJanus() {
 		numPattern = '(?:[0-9]*\\.[0-9]+|[0-9]+)(?:[eE][-+]?[0-9+])?',
 		unitPattern = '(?:em|ex|px|cm|mm|in|pt|pc|q|rem|ch|vh|vw|vmax|vmin|deg|rad|grad|ms|s|hz|khz|%)(?![a-z])',
 		// Whitespace
-		_ = '(?:\\s|' + commentToken + ')*',
-		ws = '(?:\\s|' + commentToken + ')+',
-		sws = '(' + ws + ')',
+		_ = `(?:\\s|${ commentToken })*`,
+		ws = `(?:\\s|${ commentToken })+`,
+		sws = `(${ ws })`,
 		colon = _ + ':' + _,
 		slash = _ + '/' + _,
 		comma = _ + ',' + _,
@@ -125,128 +125,133 @@ function CSSJanus() {
 		nonLetterPattern = '(^|[^a-zA-Z])',
 		noFlipPattern = '\\/\\*\\!?\\s*@noflip\\s*\\*\\/',
 		commentPattern = '\\/\\*[^*]*\\*+([^\\/*][^*]*\\*+)*\\/',
-		escapePattern = '(?:' + unicodePattern + '|\\\\[^\\r\\n\\f0-9a-f])',
-		nmstartPattern = '(?:[_a-z]|' + nonAsciiPattern + '|' + escapePattern + ')',
-		nmcharPattern = '(?:[_a-z0-9-]|' + nonAsciiPattern + '|' + escapePattern + ')',
+		escapePattern = `(?:${ unicodePattern }|\\\\[^\\r\\n\\f0-9a-f])`,
+		nmstartPattern = `(?:[_a-z]|${ nonAsciiPattern }|${ escapePattern })`,
+		nmcharPattern = `(?:[_a-z0-9-]|${ nonAsciiPattern }|${ escapePattern })`,
 		identPattern = '-?' + nmstartPattern + nmcharPattern + '*',
-		stringPattern = '(?:"(?:[^\\\"\n]|' + escapePattern + '|\\\n)*"|\'(?:[^\\\'\n]|' + escapePattern + '|\\\n)*\')',
-		quantPattern = '(?:[-+]?' + numPattern + '(?:\\s*' + unitPattern + '|' + identPattern + ')?|-?' + calcPattern + ')',
-		posQuantPattern = '(?:\\+?' + numPattern + '(?:\\s*' + unitPattern + '|' + identPattern + ')?|' + calcPattern + ')',
-		signedQuantPattern = '(' + quantPattern + '|inherit|auto)',
-		signedLineWidthPattern = '(' + quantPattern + '|inherit|auto|thin|medium|thick)',
-		fourNotationQuantPropsPattern = '((?:margin|padding|border-image-width|border-image-outset)' + colon + ')',
-		fourNotationLineWidthPropsPattern = '(border-width' + colon + ')',
-		fourNotationColorPropsPattern = '((?:border-color|border-style)' + colon + ')',
+		stringPattern = `(?:"(?:[^\\\"\n]|${ escapePattern }|\\\n)*"|'(?:[^\\\'\n]|${ escapePattern }|\\\n)*')`,
+		quantPattern = `(?:[-+]?${ numPattern }(?:\\s*${ unitPattern }|${ identPattern })?|-?${ calcPattern })`,
+		posQuantPattern = `(?:\\+?${ numPattern }(?:\\s*${ unitPattern }|${ identPattern })?|${ calcPattern })`,
+		signedQuantPattern = `(${ quantPattern }|inherit|auto)`,
 		colorPattern = '(?:' +
 			// "rgb( 255, 255, 255 )"
-			'(?:rgba?|hsla?)\\((?:' + quantPattern + '|' + comma + '|' + ws + ')+\\)' +
+			`(?:rgba?|hsla?)\\((?:${ quantPattern }|${ comma }|${ ws })+\\)` +
 			// "red", also used for border style values ("dotted")
-			'|' + nmstartPattern + nmcharPattern + '*' +
+			`|${ nmstartPattern + nmcharPattern }*` +
 			// "#FF0000"
-			'|#' + nmcharPattern + '+' +
+			`|#${ nmcharPattern }+` +
 		')',
-		signedColorPattern = '(' + colorPattern + ')',
-		urlCharsPattern = '(?:' + urlSpecialCharsPattern + '|' + nonAsciiPattern + '|' + escapePattern + ')*',
-		urlPattern = 'url\\(' + _ + '(?:' + stringPattern + '|' + urlCharsPattern + ')' + _ + '\\)',
+		urlCharsPattern = `(?:${ urlSpecialCharsPattern }|${ nonAsciiPattern }|${ escapePattern })*`,
+		urlPattern = `url\\(${ _ }(?:${ stringPattern }|${ urlCharsPattern })${ _ }\\)`,
 		sidesPattern = 'top|right|bottom|left',
-		edgesPattern = '(?:' + sidesPattern + '|center)',
+		edgesPattern = `(?:${ sidesPattern }|center)`,
 		lookAheadNotLetterPattern = '(?![a-zA-Z])',
-		lookAheadNotOpenBracePattern = '(?!(' + nmcharPattern + '|\\r?\\n|\\s|#|\\:|\\.|\\,|\\+|>|\\(|\\)|\\[|\\]|\\*|=|~=|\\^=|\\$=|\\||' + stringPattern + '|' + commentToken + ')*?{)',
-		lookAheadNotClosingParenPattern = '(?!' + urlCharsPattern + '?' + validAfterUriCharsPattern + '\\))',
-		lookAheadForClosingParenPattern = '(?=' + urlCharsPattern + '?' + validAfterUriCharsPattern + '\\))',
-		suffixPattern = '(' + _ + '(?:!important' + _ + ')?[;}])',
-		anglePattern = '(?:([-+]?' + numPattern + ')((?:deg|g?rad|turn)?))',
-		colorStopsPattern = colorPattern + '(?:' + ws + quantPattern + ')?' +
-			'(?:' + comma + colorPattern + '(?:' + ws + quantPattern + ')?)+',
+		lookAheadNotOpenBracePattern = `(?!(${ nmcharPattern }|\\r?\\n|\\s|#|\\:|\\.|\\,|\\+|>|\\(|\\)|\\[|\\]|\\*|=|~=|\\^=|\\$=|\\||${ stringPattern }|${ commentToken })*?{)`,
+		lookAheadNotClosingParenPattern = `(?!${ urlCharsPattern }?${ validAfterUriCharsPattern }\\))`,
+		lookAheadForClosingParenPattern = `(?=${ urlCharsPattern }?${ validAfterUriCharsPattern }\\))`,
+		suffixPattern = `(${ _ }(?:!important${ _ })?[;}])`,
+		anglePattern = `(?:([-+]?${ numPattern })((?:deg|g?rad|turn)?))`,
+		colorStopsPattern = `${ colorPattern }(?:${ ws + quantPattern })?` +
+			`(?:${ comma + colorPattern }(?:${ ws + quantPattern })?)+`,
 		// Regular expressions
 		commentRegExp = new RegExp( commentPattern, 'gi' ),
-		charsWithinSelectorPattern = '(?:' + urlPattern + '|' + stringPattern + '|[^\\}])*?',
-		noFlipSingleRegExp = new RegExp( '(' + noFlipPattern + lookAheadNotOpenBracePattern + '(' + urlPattern + '|[^;}])+;?)', 'gi' ),
-		noFlipClassRegExp = new RegExp( '(' + noFlipPattern + charsWithinSelectorPattern + '})', 'gi' ),
-		directionRegExp = new RegExp( '(' + directionPattern + ')(ltr|rtl)' + lookAheadNotLetterPattern, 'gi' ),
+		charsWithinSelectorPattern = `(?:${ urlPattern }|${ stringPattern }|[^\\}])*?`,
+		noFlipSingleRegExp = new RegExp( `(${ noFlipPattern + lookAheadNotOpenBracePattern }(${ urlPattern }|[^;}])+;?)`, 'gi' ),
+		noFlipClassRegExp = new RegExp( `(${ noFlipPattern + charsWithinSelectorPattern }})`, 'gi' ),
+		directionRegExp = new RegExp( `(${ directionPattern })(ltr|rtl)${ lookAheadNotLetterPattern }`, 'gi' ),
 		sidesRegExp = new RegExp( nonLetterPattern +
 			'(' +
 				// These properties accept left/right, but not top/bottom. Flip, don't ever rotate.
 				'(?:float|clear|text-align(?:-last)?)' + colon +
 				// These properties shouldn't be flipped or rotated at all. Suppress change when present.
-				'|(vertical-align' + colon + '(?:text-)?|text-orientation' + colon + 'sideways-|caption-side' + colon + ')' +
+				`|(vertical-align${ colon }(?:text-)?|text-orientation${ colon }sideways-|caption-side${ colon })` +
 			')?' +
-			'(' + sidesPattern + ')' +
+			`(${ sidesPattern })` +
 			lookAheadNotLetterPattern + lookAheadNotClosingParenPattern + lookAheadNotOpenBracePattern, 'gi' ),
 		edgeInUrlRegExp = new RegExp( nonLetterPattern + '(' + sidesPattern + ')' + lookAheadNotLetterPattern + lookAheadForClosingParenPattern, 'gi' ),
 		dirInUrlRegExp = new RegExp( nonLetterPattern + '(ltr|rtl|(?:tb|bt|vertical)-(?:lr|rl|inline)|(?:lr|rl|horizontal)-(?:tb|bt|inline))' + lookAheadNotLetterPattern + lookAheadForClosingParenPattern, 'gi' ),
-		cursorRegExp = new RegExp( '(cursor' + colon + ')(?:([ns])?([ew])?-resize|((?:row|col|ns|ew|nesw|nwse)-resize|text|vertical-text))', 'gi' ),
-		fourNotationQuantRegExp = new RegExp( fourNotationQuantPropsPattern + signedQuantPattern + sws + signedQuantPattern + '(?:' + sws + signedQuantPattern + '(?:' + sws + signedQuantPattern + ')?)?' + suffixPattern, 'gi' ),
-		fourNotationLineWidthRegExp = new RegExp( fourNotationLineWidthPropsPattern + signedLineWidthPattern + sws + signedLineWidthPattern + '(?:' + sws + signedLineWidthPattern + '(?:' + sws + signedLineWidthPattern + ')?)?' + suffixPattern, 'gi' ),
-		fourNotationColorRegExp = new RegExp( fourNotationColorPropsPattern + signedColorPattern + sws + signedColorPattern + '(?:' + sws + signedColorPattern + '(?:' + sws + signedColorPattern + ')?)?' + suffixPattern, 'gi' ),
+		cursorRegExp = new RegExp( `(cursor${ colon })(?:([ns])?([ew])?-resize|((?:row|col|ns|ew|nesw|nwse)-resize|text|vertical-text))`, 'gi' ),
+		fourNotationGroups = ( () => {
+			const group = {
+				'margin|padding|border-image-(?:width|outset)':	signedQuantPattern,
+				'border-width':	`(${ quantPattern }|inherit|auto|thin|medium|thick)`,
+				'border-color':	`(${ colorPattern })`,
+				'border-style':	`(${ identPattern })`
+			};
+			return Object.keys( group ).map( properties => {
+				const value = group[ properties ];
+				return new RegExp( `((?:${ properties })${ colon })${ value + sws + value }` +
+					`(?:${ sws + value }(?:${ sws + value })?)?${ suffixPattern }`, 'gi' );
+			} );
+		} )(),
 		quantPlainUnitRegex = new RegExp( '[-+]?' + numPattern + unitPattern, 'gi' ),
 		// Background-positions.
-		bgRegExp = new RegExp( '(background(?:-position)?)(' + colon + ')((?:' + urlPattern + '|[^;{}])+)', 'gi' ),
-		bgXYRegExp = new RegExp( '(background-position-[xy])(?:(' + colon + ')([^;{}]+)' + suffixPattern + ')?', 'gi' ),
+		bgRegExp = new RegExp( `(background(?:-position)?)(${ colon })((?:${ urlPattern }|[^;{}])+)`, 'gi' ),
+		bgXYRegExp = new RegExp( `(background-position-[xy])(?:(${ colon })([^;{}]+)${ suffixPattern })?`, 'gi' ),
 		positionValuesRegExp = new RegExp(
 			'(^|\\s|,)' +
 			// First-dimension position.
-			'((' + edgesPattern + '(?:' + ws + quantPattern + '(?=' + ws + edgesPattern + '))?)|' + quantPattern + ')' +
+			`((${ edgesPattern }(?:${ ws + quantPattern }(?=${ ws + edgesPattern }))?)|${ quantPattern })` +
 			// Second-dimension position.
-			'(?:' + sws + '((' + edgesPattern + '(?:' + ws + quantPattern + ')?)|' + quantPattern + '))?' +
-			'(?:(' + slash + ')(' + posQuantPattern + ')' + sws + '(' + posQuantPattern + '))?' + // background-size
+			`(?:${ sws }((${ edgesPattern }(?:${ ws + quantPattern })?)|${ quantPattern }))?` +
+			`(?:(${ slash })(${ posQuantPattern })${ sws }(${ posQuantPattern }))?` + // background-size
 			'(?![^()]*\\))' +
 			lookAheadNotClosingParenPattern, 'gi' ),
 		bgPositionSingleValueRegExp = new RegExp(
 			'(^|\\s|,)' +
-			'([-+]?' + numPattern + '%)' +
+			`([-+]?${ numPattern }%)` +
 			lookAheadNotClosingParenPattern, 'gi' ),
-		bgRepeatRegExp = new RegExp( '(background-repeat' + colon + ')([A-z-, ]+)' + suffixPattern, 'gi' ),
-		bgRepeatValueRegExp = new RegExp( '(?:repeat-[xy]|((?:no-)?repeat|space|round)' + sws + '((?:no-)?repeat|space|round))' + lookAheadNotClosingParenPattern, 'gi' ),
-		bgSizeRegExp = new RegExp( '(background-size' + colon + ')([^;{}]+)', 'gi' ),
-		twoQuantsRegExp = new RegExp( '(auto|' + posQuantPattern + ')(?:' + sws + '(auto|' + posQuantPattern + '))?', 'gi' ),
+		bgRepeatRegExp = new RegExp( `(background-repeat${ colon })([A-z-, ]+)` + suffixPattern, 'gi' ),
+		bgRepeatValueRegExp = new RegExp( `(?:repeat-[xy]|((?:no-)?repeat|space|round)${ sws }((?:no-)?repeat|space|round))` + lookAheadNotClosingParenPattern, 'gi' ),
+		bgSizeRegExp = new RegExp( `(background-size${ colon })([^;{}]+)`, 'gi' ),
+		twoQuantsRegExp = new RegExp( `(auto|${ posQuantPattern })(?:${ sws }(auto|${ posQuantPattern }))?`, 'gi' ),
 		linearGradientRegExp = new RegExp(
-			'((?:repeating-)?linear-gradient\\(' + _ + ')' +
-			'(?:' + anglePattern + '(' + comma + '))?' +
-			'(' + colorStopsPattern + _ + '\\))',
+			`((?:repeating-)?linear-gradient\\(${ _ })` +
+			`(?:${ anglePattern }(${ comma }))?` +
+			`(${ colorStopsPattern + _ }\\))`,
 			'gi'
 		),
 		radialGradientRegExp = new RegExp(
-			'((?:repeating-)?radial-gradient\\(' + _ + ')' +
-			'((?:' + _ + '(?:(?:closest|farthest)-(?:corner|side)|circle|ellipse|' + posQuantPattern + ')(?=\\s|,))*)' +
-			'(' + ws + 'at(?:' + ws + '(?:' + edgesPattern + '|' + quantPattern + ')){1,4})?' + // positon
-			'(' + comma + colorStopsPattern + _ + '\\))',
+			`((?:repeating-)?radial-gradient\\(${ _ })` +
+			`((?:${ _ }(?:(?:closest|farthest)-(?:corner|side)|circle|ellipse|${ posQuantPattern })(?=\\s|,))*)` +
+			`(${ ws }at(?:${ ws }(?:${ edgesPattern }|${ quantPattern })){1,4})?` + // positon
+			`(${ comma + colorStopsPattern + _ }\\))`,
 			'gi'
 		),
-		borderImageRegExp = new RegExp( '(border-image(?:-slice)?' + colon + '[^;}]*?)' +
-			signedQuantPattern + '(?:(' + ws + '(?:fill' + ws + ')?)' + signedQuantPattern + '(?:(' + ws + '(?:fill' + ws + ')?)' + signedQuantPattern + '(?:(' + ws + '(?:fill' + ws + ')?)' + signedQuantPattern + ')?)?)?' +
-			'(?:((?:' + ws + 'fill)?' + slash + ')(?:' + signedQuantPattern + '(?:' + sws + signedQuantPattern + '(?:' + sws + signedQuantPattern + '(?:' + sws + signedQuantPattern + ')?)?)?)?' +
-				'(?:(' + slash + ')(?:' + signedQuantPattern + '(?:' + sws + signedQuantPattern + '(?:' + sws + signedQuantPattern + '(?:' + sws + signedQuantPattern + ')?)?)?)?)?' +
+		borderImageRegExp = new RegExp( `(border-image(?:-slice)?${ colon }[^;}]*?)` +
+			`${ signedQuantPattern }(?:(${ ws }(?:fill${ ws })?)${ signedQuantPattern }(?:(${ ws }(?:fill${ ws })?)${ signedQuantPattern }(?:(${ ws }(?:fill${ ws })?)${ signedQuantPattern })?)?)?` +
+			`(?:((?:${ ws }fill)?${ slash })(?:${ signedQuantPattern }(?:${ sws + signedQuantPattern }(?:${ sws + signedQuantPattern }(?:${ sws + signedQuantPattern })?)?)?)?` +
+				`(?:(${ slash })(?:${ signedQuantPattern }(?:${ sws + signedQuantPattern }(?:${ sws + signedQuantPattern }(?:${ sws + signedQuantPattern })?)?)?)?)?` +
 			')?' +
 			lookAheadNotClosingParenPattern, 'gi' ),
-		borderImageRepeatRegExp = new RegExp( '(border-image(?:-repeat)?' + colon + '[^;}]*?)(stretch|repeat|round|space)' + sws + '(stretch|repeat|round|space)' + lookAheadNotLetterPattern + lookAheadNotClosingParenPattern, 'gi' ),
+		borderImageRepeatRegExp = new RegExp( `(border-image(?:-repeat)?${ colon }[^;}]*?)(stretch|repeat|round|space)${ sws }(stretch|repeat|round|space)` + lookAheadNotLetterPattern + lookAheadNotClosingParenPattern, 'gi' ),
 		// border-radius: <length or percentage>{1,4} [optional: / <length or percentage>{1,4} ]
-		borderRadiusRegExp = new RegExp( '(border-radius' + colon + ')' + signedQuantPattern + '(?:(?:' + sws + signedQuantPattern + ')(?:' + sws + signedQuantPattern + ')?(?:' + sws + signedQuantPattern + ')?)?' +
-			'(?:(?:(' + slash + ')' + signedQuantPattern + ')(?:' + sws + signedQuantPattern + ')?(?:' + sws + signedQuantPattern + ')?(?:' + sws + signedQuantPattern + ')?)?' + suffixPattern, 'gi' ),
-		borderRadiusSingleCornerRegExp = new RegExp( 'border-(left|right)-(top|bottom)-radius(?:(' + colon + ')(' + posQuantPattern + ')' + sws + '(' + posQuantPattern + '))?' + lookAheadNotOpenBracePattern + lookAheadNotClosingParenPattern, 'gi' ),
-		shadowRegExp = new RegExp( '((?:box|text)-shadow' + colon + '|drop-shadow\\(' + _ + ')' +
+		borderRadiusRegExp = new RegExp( `(border-radius${ colon })${ signedQuantPattern }(?:(?:${ sws + signedQuantPattern })(?:${ sws + signedQuantPattern })?(?:${ sws + signedQuantPattern })?)?` +
+			`(?:(?:(${ slash })${ signedQuantPattern })(?:${ sws + signedQuantPattern })?(?:${ sws + signedQuantPattern })?(?:${ sws + signedQuantPattern })?)?` + suffixPattern, 'gi' ),
+		borderRadiusSingleCornerRegExp = new RegExp( `border-(left|right)-(top|bottom)-radius(?:(${ colon })(${ posQuantPattern })${ sws }(${ posQuantPattern }))?` + lookAheadNotOpenBracePattern + lookAheadNotClosingParenPattern, 'gi' ),
+		shadowRegExp = new RegExp( `((?:box|text)-shadow${ colon }|drop-shadow\\(${ _ })` +
 			'(' +
-				'(?:inset|' + quantPattern + '|' + colorPattern + ')' +
-				'(?:(?:' + ws + '|' + comma + ')(?:inset|' + quantPattern + '|' + colorPattern + '))*' +
+				`(?:inset|${ quantPattern }|${ colorPattern })` +
+				`(?:(?:${ ws }|${ comma })(?:inset|${ quantPattern }|${ colorPattern }))*` +
 			')',
 			'gi'
 		),
-		shadowValueRegExp = new RegExp( '(' + colorPattern + ws + '(?:inset' + ws + ')?)?' + signedQuantPattern + sws + signedQuantPattern + '([^,;}]*)', 'gi' ),
-		transformRegExp = new RegExp( '(transform' + colon + ')([^;{}]+)' + suffixPattern, 'gi' ),
-		transformFunctionRegExp = new RegExp( '((?:rotate|translate|skew|scale|matrix)(?:x|y|z|3d)?)(\\(' + _ + ')([^\\)]*?)(' + _ + '\\))', 'gi' ),
-		transformOriginRegExp = new RegExp( '(transform-origin' + colon + ')' +
-			'(?=((?:top|bottom)' + ws + quantPattern + '|' + quantPattern + ws + '(?:left|right))?)' +
-			'(?=((?:left|right)' + ws + quantPattern + '|' + quantPattern + ws + '(?:top|bottom))?)' +
-			'(' + edgesPattern + '(?=' + ws + quantPattern + ')|' + quantPattern + ')' +
-			'(?:' + sws + '(' + edgesPattern + '|' + quantPattern + '))?', 'gi' ),
-		perspectiveOriginRegExp = new RegExp( '(perspective-origin' + colon + ')([^;{}]+)', 'gi' ),
+		shadowValueRegExp = new RegExp( `((?:${ colorPattern + ws }(?:inset${ ws })?)?)${ signedQuantPattern + sws + signedQuantPattern }([^,;}]*)`, 'gi' ),
+		transformRegExp = new RegExp( `(transform${ colon })([^;{}]+)` + suffixPattern, 'gi' ),
+		transformFunctionRegExp = new RegExp( `((?:rotate|translate|skew|scale|matrix)(?:x|y|z|3d)?)(\\(${ _ })([^\\)]*?)(${ _ }\\))`, 'gi' ),
+		transformOriginRegExp = new RegExp( `(transform-origin${ colon })` +
+			`(?=((?:top|bottom)${ ws + quantPattern }|${ quantPattern + ws }(?:left|right))?)` +
+			`(?=((?:left|right)${ ws + quantPattern }|${ quantPattern + ws }(?:top|bottom))?)` +
+			`(${ edgesPattern }(?=${ ws + quantPattern })|${ quantPattern })` +
+			`(?:${ sws }(${ edgesPattern }|${ quantPattern }))?`, 'gi' ),
+		perspectiveOriginRegExp = new RegExp( `(perspective-origin${ colon })([^;{}]+)`, 'gi' ),
 		sizeRegExp = new RegExp( '(max-|min-|[^-a-z])(height|width)' + lookAheadNotLetterPattern + lookAheadNotClosingParenPattern + lookAheadNotOpenBracePattern, 'gi' ),
-		writingModeRegExp = new RegExp( '(writing-mode' + colon + ')(tb|bt|rl|lr|horizontal|vertical)-(tb|bt|rl|lr)', 'gi' ),
-		resizeRegExp = new RegExp( '(resize' + colon + ')(horizontal|vertical)', 'gi' ),
-		xyPropRegExp = new RegExp( '(overflow|scroll-snap-points|scroll-snap-type|overscroll-behavior|pan)-([xy])' + lookAheadNotClosingParenPattern + lookAheadNotOpenBracePattern, 'gi' ),
-		mediaQueryRegExp = new RegExp( '(@media' + ws + ')([^{}]+)(\\{)', 'gi' ),
-		mediaOrientationRegExp = new RegExp( '(orientation' + colon + ')(landscape|portrait)', 'gi' ),
-		mediaFeatureRegExp = new RegExp( '(width|height|aspect-ratio)(' + colon + ')(?:(' + posQuantPattern + ')(?:(' + slash + ')(' + posQuantPattern + '))?)?', 'gi' ),
+		writingModeRegExp = new RegExp( `(writing-mode${ colon })(tb|bt|rl|lr|horizontal|vertical)-(tb|bt|rl|lr)`, 'gi' ),
+		resizeRegExp = new RegExp( `(resize${ colon })(horizontal|vertical)`, 'gi' ),
+		xyPropRegExp = new RegExp( '((?:overflow|scroll-snap-(?:points|type)|overscroll-behavior|pan)-)([xy])' + lookAheadNotClosingParenPattern + lookAheadNotOpenBracePattern, 'gi' ),
+		mediaQueryRegExp = new RegExp( `(@media${ ws })([^{}]+)(\\{)`, 'gi' ),
+		mediaOrientationRegExp = new RegExp( `(orientation${ colon })(landscape|portrait)`, 'gi' ),
+		mediaFeatureRegExp = new RegExp( `(width|height|aspect-ratio)(${ colon })(?:(${ posQuantPattern })(?:(${ slash })(${ posQuantPattern }))?)?`, 'gi' ),
 		// Angle units and their values for full circles.
 		angleMaxes = {
 			deg: 360,
@@ -254,6 +259,58 @@ function CSSJanus() {
 			rad: Math.PI * 2,
 			turn: 1
 		};
+
+	/**
+	 * Perform text replacements on a string with provided regular expressions
+	 * and functions.
+	 *
+	 * The first captured group bypasses the replacement function and is added
+	 * directly to the beginning of the result, and the argument matching the
+	 * entire substring similarly bypasses the function.
+	 *
+	 * This function can be used in one of two ways:
+	 * * regexArray can be a RegExp or array of RegExps, which get replaced by fn.
+	 * * regexArray can be an array of RegExp-group/function pairs, in arrays,
+	 *   which are run through .replace sequentially.
+	 *
+	 * @example
+	 * // returns 'a:B'
+	 * replace( 'a:b', /(a:)(b)/, letter => letter.toUpperCase() );
+	 *
+	 * @example
+	 * // returns 'a:B;a:C;'
+	 * replace( 'a:b;a:c;', [ /(a:)(b)/, /(a:)(c)/ ], letter => letter.toUpperCase() );
+	 *
+	 * @example
+	 * // returns 'a:B;a:C;d:fe;'
+	 * replace( 'a:b;a:c;d:e-f;', [
+	 *   [ [ /(a:)(b)/, /(a:)(c)/ ], letter => letter.toUpperCase() ],
+	 *   [ /(d:)(e)-(f)/, ( e, f ) => { return f + e; } ]
+	 * ] );
+	 *
+	 * @param {string} string Original string to run the replacements on.
+	 * @param {(RegExp|RegExp[]|Array[])} regexArray Regular expression(s) to
+	 * replace, or array of RegExp-group/function pairs.
+	 *
+	 * For a collection of different types of replacements:
+	 * @param {RegExp|RegExp[]} regexArray[].0 RegExp(s) to replace.
+	 * @param {Function} regexArray[].1 Function to replace the matches of the corresponding RegExp(s).
+	 *
+	 * To replace with a single function:
+	 * @param {Function} [fn] Function to replace the matches of the RegExp(s).
+	 *
+	 * @return {string}
+	 */
+	function replace( string, regexArray, fn ) {
+		regexArray = Array.isArray( regexArray ) ? regexArray : [ regexArray ];
+		if ( regexArray[ 0 ] instanceof RegExp ) {
+			return regexArray.reduce( ( acc, regex ) => acc.replace( regex, function ( match, pre ) {
+				return pre + fn.apply( null, Array.prototype.slice.call( arguments, 2 ) );
+			} ), string );
+		} else {
+			return regexArray.reduce( ( acc, rSet ) => replace( acc, rSet[ 0 ], rSet[ 1 ] ), string );
+		}
+	}
 
 	/**
 	 * Generates an array containing numeric versions of the inline-start and block-start of the given direction.
@@ -264,9 +321,7 @@ function CSSJanus() {
 	 * @return {Array}
 	 */
 	function orientationArray( dir ) {
-		return dir.split( '-' ).map( function ( dir ) {
-			return directions[ dir ];
-		} );
+		return dir.split( '-' ).map( dir => directions[ dir ] );
 	}
 
 	/**
@@ -277,7 +332,7 @@ function CSSJanus() {
 	 * @return {number}
 	 */
 	function getPrecision( value ) {
-		var valueString = value.toString(),
+		const valueString = value.toString(),
 			decimalIndex = valueString.indexOf( '.' );
 		return decimalIndex === -1 ? 0 : valueString.length - decimalIndex - 1;
 	}
@@ -424,14 +479,10 @@ function CSSJanus() {
 				noFlipClassTokenizer,
 				commentTokenizer,
 				calcTokenizer,
-				i,
 				swapText,
-				sourceDir,
-				targetDir;
-
-			// Default values
-			sourceDir = options.sourceDir || 'lr-tb';
-			targetDir = options.targetDir || 'rl-tb';
+				// Default values
+				sourceDir = options.sourceDir || 'lr-tb',
+				targetDir = options.targetDir || 'rl-tb';
 
 			if ( sourceDir === targetDir ) {
 				return css;
@@ -455,7 +506,7 @@ function CSSJanus() {
 			noFlipClassTokenizer = new Tokenizer( noFlipClassRegExp, noFlipClassToken );
 			commentTokenizer = new Tokenizer( commentRegExp, commentToken );
 
-			for ( i = 0; i < 4; i++ ) {
+			for ( let i = 0; i < 4; i++ ) {
 				// Which sides are moved where, eg map[ 1 ] = 3 means that the right is the old left.
 				map[ target[ i & 1 ] ^ ( i & 2 ) ] = source[ i & 1 ] ^ ( i & 2 );
 				// Which corners are moved where, eg cornersMap[ 0 ] = 1 means that the top-left is the old top-right.
@@ -468,10 +519,9 @@ function CSSJanus() {
 
 			swapText = ( function () {
 				var textChanges = {},
-					rotateMap,
-					i;
+					rotateMap;
 
-				for ( i = 0; i < 4; i++ ) {
+				for ( let i = 0; i < 4; i++ ) {
 					textChanges[ sides[ map[ i ] ] ] = sides[ i ]; // "left", "top", etc
 					textChanges[ cursors[ map[ i ] ] ] = cursors[ i ]; // "n[-resize]", etc.
 					textChanges[ wmDirs[ map[ i ] ] ] = wmDirs[ i ]; // "tb", "lr", etc.
@@ -525,17 +575,13 @@ function CSSJanus() {
 				 */
 				return function swapText( text ) {
 					// CSS property names are case insensitive.
-					var lcText = text && text.toLowerCase();
+					const lcText = text && text.toLowerCase();
 					return textChanges[ lcText ] || text || '';
 				};
 			}() );
 
-			function fourNotation( match, pre, q1, s1, q2, s2, q3, s3, q4, s4 ) {
-				return pre + processFourNotationArray( map, [].slice.call( arguments, 2, 9 ), quarterTurned ) + s4;
-			}
-
 			function positionFormat( val ) {
-				return val.replace( positionValuesRegExp, function ( match, pre, xPos, xEdge, space1, yPos, yEdge, slash, sizeX, sizeSpace, sizeY ) {
+				return replace( val, positionValuesRegExp, ( xPos, xEdge, space1, yPos, yEdge, slash, sizeX, sizeSpace, sizeY ) => {
 					// Edge offsets are not supported in IE8, so don't switch to it unless it was already being used.
 					var position;
 					if ( !xEdge || !yEdge ) {
@@ -564,7 +610,7 @@ function CSSJanus() {
 						yPos + space1 + xPos :
 						xPos + space1 + yPos;
 
-					return pre + position +
+					return position +
 						( sizeY ?
 							slash + ( quarterTurned ?
 								// Swap background-size shorthand values.
@@ -579,25 +625,18 @@ function CSSJanus() {
 			// calc() is more complicated than comments, because they can be
 			// nested, which can't be handled by normal regular expressions.
 			calcTokenizer = ( function ( token ) {
-				var matches = [];
+				const matches = [];
 
 				return {
 					tokenize: function ( css ) {
-						var calcIndex,
-							depth,
-							lastBracket,
-							nextOpen,
-							nextClose,
-							regex = /(?=((?:-moz-|-webkit-)?calc\())/gi,
-							lastCalc;
+						const regex = /(?=((?:-moz-|-webkit-)?calc\())/gi;
 
-						for ( ; ( lastCalc = regex.exec( css ) ); ) {
-							calcIndex = lastCalc.index;
-							lastBracket = calcIndex + lastCalc[ 1 ].length;
-							depth = 1;
-							for ( ; depth > 0; ) {
-								nextOpen = css.indexOf( '(', lastBracket );
-								nextClose = css.indexOf( ')', lastBracket );
+						for ( let lastCalc; ( lastCalc = regex.exec( css ) ); ) {
+							let calcIndex = lastCalc.index,
+								lastBracket = calcIndex + lastCalc[ 1 ].length;
+							for ( let depth = 1; depth > 0; ) {
+								let nextOpen = css.indexOf( '(', lastBracket ),
+									nextClose = css.indexOf( ')', lastBracket );
 								if ( nextOpen !== -1 && nextOpen < nextClose ) {
 									lastBracket = nextOpen + 1;
 									depth++;
@@ -624,9 +663,9 @@ function CSSJanus() {
 						return css;
 					},
 					detokenize: function ( str ) {
-						var regex = new RegExp( '(-?)' + token.replace( /\$1/, '(\\d+)' ), 'g' );
+						const regex = new RegExp( '(-?)' + token.replace( /\$1/, '(\\d+)' ), 'g' );
 						return str.replace( regex, function ( match, negative, index ) {
-							var calc = matches[ index ];
+							let calc = matches[ index ];
 							if ( negative ) {
 								// Flip all values with units.
 								calc = calc.replace( quantPlainUnitRegex, flipSign );
@@ -653,100 +692,64 @@ function CSSJanus() {
 			// Transform URLs
 			if ( options.transformDirInUrl ) {
 				// Transform directions and writing-modes in background URLs.
-				css = css.replace( dirInUrlRegExp, function ( match, pre, dir ) {
+				css = replace( css, dirInUrlRegExp, dir => {
 					// Valid directions:
 					//   ltr, rtl, tb-lr, tb-rl, lr-tb, lr-bt, rl-tb, rl-bt, bt-lr, bt-rl
 					//   horizontal-tb, horizontal-bt, vertical-lr, vertical-rl,
 					//   tb-inline, bt-inline, lr-inline, rl-inline, horizontal-inline, vertical-inline,
-
-					return pre + dir.split( '-' ).map( function ( val ) {
-						return swapText( val );
-					} ).join( '-' );
+					return dir.split( '-' ).map( swapText ).join( '-' );
 				} );
 			}
 			if ( options.transformEdgeInUrl ) {
 				// Replace 'left', 'top', 'right', and 'bottom' with the appropriate side in background URLs
-				css = css.replace( edgeInUrlRegExp, function ( match, pre, edge ) {
-					return pre + swapText( edge );
-				} );
+				css = replace( css, edgeInUrlRegExp, swapText );
 			}
 
 			// Transform rules
-			css = css
+			css = replace( css, [
 				// Flip rules like left: , padding-right: , etc.
-				.replace( sidesRegExp, function ( match, prefix, dontRotate, suppressChange, side ) {
-					return dontRotate ?
+				[ sidesRegExp, ( dontRotate, suppressChange, side ) =>
+					dontRotate ?
 						// Dealing with a property with non-standard behaviour regarding sides.
 						// For example:
 						// * caption-side is writing-mode-relative, and shouldn't ever be
 						//   rotated or flipped. suppressChange = true
 						// * float: left/right works by direction, not writing mode. It can
-            //   be flipped between left and right, but never rotated.
-						prefix + dontRotate +
+						//   be flipped between left and right, but never rotated.
+						dontRotate +
 							( !suppressChange && dirFlipped && ( { right: 'left', left: 'right' }[ side.toLowerCase() ] ) || side ) :
 						// Normal sides. Rotate/flip as applicable.
-						prefix + swapText( side );
-				} )
+						swapText( side )
+				],
 				// Transform North/East/South/West in rules like cursor: nw-resize;
-				.replace( cursorRegExp, function ( match, pre, ns, ew, otherCursor ) {
-					return pre + (
-						otherCursor ?
-							// cursor: ns/ew/nesw/nwse/row/col-resize/text/vertical-text
-							swapText( otherCursor ) :
-							// cursor: n/e/s/w/ne/nw/se/sw-resize
-							swapText( quarterTurned ? ew : ns ) +
-							swapText( quarterTurned ? ns : ew ) + '-resize'
-					);
-				} )
+				[ cursorRegExp, ( ns, ew, otherCursor ) =>
+					otherCursor ?
+						// cursor: ns/ew/nesw/nwse/row/col-resize/text/vertical-text
+						swapText( otherCursor ) :
+						// cursor: n/e/s/w/ne/nw/se/sw-resize
+						swapText( quarterTurned ? ew : ns ) +
+						swapText( quarterTurned ? ns : ew ) + '-resize'
+				],
 				// Border radius
-				.replace( borderRadiusRegExp, function ( match, pre ) {
-					var preSlash = processFourNotationArray( cornersMap, [].slice.call( arguments, 2, 9 ), cornersFlipped ),
-						postSlash = processFourNotationArray( cornersMap, [].slice.call( arguments, 10, 17 ), cornersFlipped );
-					return pre +
-						( quarterTurned ? postSlash + ( arguments[ 9 ] || '' ) + preSlash : preSlash + ( arguments[ 9 ] || '' ) + postSlash ) +
-						( arguments[ 17 ] || '' );
-				} )
+				[ borderRadiusRegExp, function () {
+					const preSlash = processFourNotationArray( cornersMap, [].slice.call( arguments, 0, 7 ), cornersFlipped ),
+						postSlash = processFourNotationArray( cornersMap, [].slice.call( arguments, 8, 15 ), cornersFlipped );
+					return ( quarterTurned ? postSlash + ( arguments[ 7 ] || '' ) + preSlash : preSlash + ( arguments[ 7 ] || '' ) + postSlash ) +
+						( arguments[ 15 ] || '' );
+				} ],
 				// Shadows
-				.replace( shadowRegExp, function ( match, prop, value ) {
-					return prop + value.replace( shadowValueRegExp, function ( match, color, X, space, Y, end ) {
-						return ( color || '' ) + ( flipXYPositions( map[ 1 ], X, Y ) + space + flipXYPositions( map[ 2 ], X, Y ) ) + end;
-					} );
-				} )
+				[ shadowRegExp, value =>
+					replace( value, shadowValueRegExp, ( X, space, Y, end ) =>
+						flipXYPositions( map[ 1 ], X, Y ) + space + flipXYPositions( map[ 2 ], X, Y ) + end
+					)
+				],
 				// Switch around parts in two-, three-, and four-part notation rules
 				// like padding: 1px 2px 3px 4px;
-				.replace( fourNotationQuantRegExp, fourNotation )
-				.replace( fourNotationLineWidthRegExp, fourNotation )
-				.replace( fourNotationColorRegExp, fourNotation )
-				// Transform background positions, and shorthands for background-size and background-repeat.
-				.replace( bgRegExp, function ( match, prop, space, val ) {
-
-					if ( quarterTurned ) {
-						val = val.replace( bgRepeatValueRegExp, backgroundTwoPointSwap );
-					}
-
-					return swapText( prop ) + space + positionFormat( val );
-				} )
-				// Background-position-x and background-position-y
-				.replace( bgXYRegExp, function ( match, prop, space, val, suffix ) {
-					return (
-						// When switching between horizontal and vertical writing, replace
-						// background-position-x with -y and vice versa.
-						swapText( prop ) +
-						// If there's a value, transform it. (No value if in transition statement.)
-						( space ? space + val.replace( bgPositionSingleValueRegExp, function ( match, pre, position ) {
-							if ( prop.toLowerCase() === 'background-position-x' ?
-								flipX :
-								flipY
-							) {
-								position = flipPositionValue( position );
-							}
-
-							return pre + position;
-						} ) + suffix : '' )
-					);
-				} )
+				[ fourNotationGroups, function ( q1, s1, q2, s2, q3, s3, q4, s4 ) {
+					return processFourNotationArray( map, [].slice.call( arguments, 0, 7 ), quarterTurned ) + s4;
+				} ],
 				// Background gradients.
-				.replace( linearGradientRegExp, function ( match, pre, angleQuant, angleUnitText, space, post ) {
+				[ linearGradientRegExp, ( angleQuant, angleUnitText, space, post ) => {
 					var angleQuantFloat = parseFloat( angleQuant || 180 ),
 						angleUnit = angleUnitText || 'deg',
 						angleText = '',
@@ -756,7 +759,7 @@ function CSSJanus() {
 
 					if ( angleQuantFloat === 0 && angleUnitText ) {
 						// Invalid angle.
-						return match;
+						return angleQuant + angleUnitText + space + post;
 					}
 
 					precision = Math.max( getPrecision( angleQuant || '0' ), getPrecision( addedRotation ) );
@@ -767,9 +770,9 @@ function CSSJanus() {
 						angleText = angleQuant.toFixed( precision ) + ( angleQuant === 0 ? angleUnitText : angleUnit ) + ( space || ', ' );
 					}
 
-					return pre + angleText + post;
-				} )
-				.replace( radialGradientRegExp, function ( match, pre, shape, position, post ) {
+					return angleText + post;
+				} ],
+				[ radialGradientRegExp, function ( shape, position, post ) {
 
 					if ( shape.indexOf( 'ellipse' ) !== -1 && quarterTurned ) {
 						// Swap X and Y sizes.
@@ -778,22 +781,22 @@ function CSSJanus() {
 
 					position = position ? positionFormat( position ) : '';
 
-					return pre + shape + position + post;
-				} )
-
+					return shape + position + post;
+				} ],
 				// Border images
-				.replace( borderImageRegExp, function ( match, pre ) {
-					return pre +
+				[ borderImageRegExp, function () {
+					return (
 						// border-image-slice
-						processFourNotationArray( map, [].slice.call( arguments, 2, 9 ), quarterTurned ) + ( arguments[ 9 ] || '' ) +
+						processFourNotationArray( map, [].slice.call( arguments, 0, 7 ), quarterTurned ) + ( arguments[ 7 ] || '' ) +
 						// border-image-width
-						processFourNotationArray( map, [].slice.call( arguments, 10, 17 ), quarterTurned ) + ( arguments[ 17 ] || '' ) +
+						processFourNotationArray( map, [].slice.call( arguments, 8, 15 ), quarterTurned ) + ( arguments[ 15 ] || '' ) +
 						// border-image-outset
-						processFourNotationArray( map, [].slice.call( arguments, 18, 25 ), quarterTurned );
-				} )
+						processFourNotationArray( map, [].slice.call( arguments, 16, 23 ), quarterTurned )
+					);
+				} ],
 				// Transforms
-				.replace( transformRegExp, function ( match, prop, value, suffix ) {
-					return prop + value.replace( transformFunctionRegExp,
+				[ transformRegExp, function ( value, suffix ) {
+					return value.replace( transformFunctionRegExp,
 						function ( match, fnName, start, value, end ) {
 							var lcFnName = fnName.toLowerCase(),
 								newProp = swapText( fnName ),
@@ -918,14 +921,14 @@ function CSSJanus() {
 							}
 
 							return newProp + start + vals.reduce( function ( acc, val, index ) {
+								// Reassemble the function, interspersing the original separators.
 								return acc + ( separators[ index - 1 ] || ', ' ) + val;
 							} ) + end;
 						}
 					) + suffix;
-				} )
-				.replace( transformOriginRegExp, function ( match, prop, reverseOrder, reverseOrderQT, v1, space, v2 ) {
-					var temp,
-						isReverseOrder = quarterTurned ? reverseOrderQT : reverseOrder,
+				} ],
+				[ transformOriginRegExp, function ( reverseOrder, reverseOrderQT, v1, space, v2 ) {
+					var isReverseOrder = quarterTurned ? reverseOrderQT : reverseOrder,
 						x = isReverseOrder ? v2 : v1,
 						y = isReverseOrder ? v1 : v2;
 
@@ -936,62 +939,80 @@ function CSSJanus() {
 						y = flipPositionValue( y );
 					}
 					if ( quarterTurned ) {
-						temp = y;
+						let temp = y;
 						y = x;
 						x = temp;
 					}
 
-					return prop + ( isReverseOrder ?
+					return ( isReverseOrder ?
 						( y ? y + space : 'center ' ) + x :
 						( x ? x + ( y ? space + y : '' ) : 'center ' + y )
 					);
-				} )
-				.replace( perspectiveOriginRegExp, function ( match, prop, val ) {
-					return prop + positionFormat( val );
-				} )
+				} ],
+				[ perspectiveOriginRegExp, positionFormat ],
 				// Writing mode
-				.replace( writingModeRegExp, function ( match, prop, inline, block ) {
-					return prop +
-						// Inline direction
-						swapText( inline ) + '-' +
-						// Block direction
-						swapText( block );
+				[ writingModeRegExp, ( inline, block ) =>
+					// Inline direction   /    Block direction
+					swapText( inline ) + '-' + swapText( block )
+				]
+			] );
+
+			// Transform background positions, and shorthands for background-size and background-repeat.
+			css = css
+				.replace( bgRegExp, function ( match, prop, space, val ) {
+
+					if ( quarterTurned ) {
+						val = val.replace( bgRepeatValueRegExp, backgroundTwoPointSwap );
+					}
+
+					return swapText( prop ) + space + positionFormat( val );
+				} )
+				// Background-position-x and background-position-y
+				.replace( bgXYRegExp, function ( match, prop, space, val, suffix ) {
+					return (
+						// When switching between horizontal and vertical writing, replace
+						// background-position-x with -y and vice versa.
+						swapText( prop ) +
+						// If there's a value, transform it. (No value if in transition statement.)
+						( space ? space + replace( val, bgPositionSingleValueRegExp, position => {
+							if ( prop.toLowerCase() === 'background-position-x' ?
+								flipX :
+								flipY
+							) {
+								position = flipPositionValue( position );
+							}
+
+							return position;
+						} ) + suffix : '' )
+					);
 				} );
 
 			if ( dirFlipped ) {
 				// Replace direction: ltr; with direction: rtl; and vice versa.
-				css = css.replace( directionRegExp, function ( match, pre, dir ) {
-					return pre + swapText( dir );
-				} );
+				css = replace( css, directionRegExp, swapText );
 			}
 
 			if ( quarterTurned ) {
+				css = replace( css, [
+					[ [ resizeRegExp, xyPropRegExp, sizeRegExp ], swapText ],
+					[ bgRepeatRegExp, ( value, suffix ) =>
+						value.replace( bgRepeatValueRegExp, backgroundTwoPointSwap ) + suffix
+					],
+					[ bgSizeRegExp, value =>
+						value.replace( twoQuantsRegExp, ( match, x, space, y ) =>
+							match.toLowerCase() === 'auto' ? match : ( y ? y + space : 'auto ' ) + x
+						)
+					],
+					[ mediaQueryRegExp, ( value, suffix ) =>
+						replace( value, mediaOrientationRegExp, swapText )
+							.replace( mediaFeatureRegExp, ( match, prop, space, value, slash, vPixels ) =>
+								swapText( prop ) + space +
+									( slash ? vPixels + slash + value : value )
+							) + suffix
+					]
+				] );
+
 				css = css
-					.replace( resizeRegExp, function ( match, prop, value ) {
-						return prop + swapText( value );
-					} )
-					.replace( xyPropRegExp, function ( match, prop, dimension ) {
-						return prop + '-' + swapText( dimension );
-					} )
-					.replace( sizeRegExp, function ( match, prefix, prop ) {
-						return prefix + swapText( prop );
-					} )
-					.replace( bgRepeatRegExp, function ( match, prop, value, suffix ) {
-						return prop + value.replace( bgRepeatValueRegExp, backgroundTwoPointSwap ) + suffix;
-					} )
-					.replace( bgSizeRegExp, function ( match, prop, value ) {
-						return prop + value.replace( twoQuantsRegExp, function ( match, x, space, y ) {
-							return match.toLowerCase() === 'auto' ? match : ( y ? y + space : 'auto ' ) + x;
-						} );
-					} )
-					.replace( mediaQueryRegExp, function ( match, prefix, value, suffix ) {
-						return prefix + value.replace( mediaFeatureRegExp, function ( match, prop, space, value, slash, vPixels ) {
-							return swapText( prop ) + space +
-								( slash ? vPixels + slash + value : value );
-						} ).replace( mediaOrientationRegExp, function ( match, prop, value ) {
-							return prop + swapText( value );
-						} ) + suffix;
-					} )
 					.replace( borderImageRepeatRegExp, '$1$4$3$2' )
 					.replace( borderRadiusSingleCornerRegExp, 'border-$2-$1-radius$3$6$5$4' );
 			}
@@ -1031,7 +1052,7 @@ cssjanus = new CSSJanus();
  * @return {string} Transformed stylesheet
  */
 exports.transform = function ( css, options, transformEdgeInUrl ) {
-	var norm;
+	let norm;
 	if ( typeof options === 'object' ) {
 		norm = options;
 	} else {
