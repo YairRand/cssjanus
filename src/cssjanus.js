@@ -16,16 +16,20 @@ var cssjanus;
  *
  * @author Trevor Parscal
  * @author Roan Kattouw
+ * @author Yair Rand
  *
  * @class
  * @constructor
  * @param {RegExp} regex Regular expression whose matches to replace by a token
- * @param {string} token Placeholder text
+ * @param {string} token Placeholder text, containing the string "\d+", to
+   replace with the index of the token.
  */
 function Tokenizer( regex, token ) {
 
 	var matches = [],
-		index = 0;
+		tokenParts = token.split( /\\d\+/ ),
+		tokenStart = tokenParts[ 0 ],
+		tokenEnd = tokenParts[ 1 ];
 
 	/**
 	 * Add a match.
@@ -35,18 +39,20 @@ function Tokenizer( regex, token ) {
 	 * @return {string} Token to leave in the matched string's place
 	 */
 	function tokenizeCallback( match ) {
-		matches.push( match );
-		return token;
+		var index = matches.push( match );
+		return tokenStart + index + tokenEnd;
 	}
 
 	/**
 	 * Get a match.
 	 *
 	 * @private
+	 * @param {string} tokenMatch Matched token
+	 * @param {string} foundIndex Index of the matched token
 	 * @return {string} Original matched string to restore
 	 */
-	function detokenizeCallback() {
-		return matches[ index++ ];
+	function detokenizeCallback( tokenMatch, foundIndex ) {
+		return matches[ foundIndex - 1 ];
 	}
 
 	return {
@@ -67,7 +73,8 @@ function Tokenizer( regex, token ) {
 		 * @return {string} Original string
 		 */
 		detokenize: function ( str ) {
-			return str.replace( new RegExp( '(' + token + ')', 'g' ), detokenizeCallback );
+			var tokenRegex = new RegExp( tokenStart + '(\\d+)' + tokenEnd, 'g' );
+			return str.replace( tokenRegex, detokenizeCallback );
 		}
 	};
 }
@@ -102,15 +109,16 @@ function CSSJanus() {
 			lr: 3
 		},
 		// Tokens
-		noFlipSingleToken = '`NOFLIP_SINGLE`',
-		noFlipClassToken = '`NOFLIP_CLASS`',
-		commentToken = '`COMMENT`',
-		calcToken = '`CALC$1`',
-		calcPattern = '`CALC\\d+`',
+		noFlipSingleToken = '`NOFLIP_SINGLE\\d+`',
+		noFlipClassToken = '`NOFLIP_CLASS\\d+`',
+		commentToken = '`COMMENT\\d+`',
+		calcToken = '`CALC\\d+`',
+		fnToken = '`FN\\d+`',
+		stringToken = '`STRING\\d+`',
 		// Patterns
 		nonAsciiPattern = '[^\\u0020-\\u007e]',
 		unicodePattern = '(?:(?:\\\\[0-9a-f]{1,6})(?:\\r\\n|\\s)?)',
-		numPattern = '(?:[0-9]*\\.[0-9]+|[0-9]+)(?:[eE][-+]?[0-9+])?',
+		numPattern = '(?:[0-9]*\\.[0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?',
 		unitPattern = '(?:em|ex|px|cm|mm|in|pt|pc|q|rem|ch|vh|vw|vmax|vmin|deg|rad|grad|ms|s|hz|khz|%)(?![a-z])',
 		// Whitespace
 		_ = `(?:\\s|${ commentToken })*`,
@@ -129,9 +137,10 @@ function CSSJanus() {
 		nmstartPattern = `(?:[_a-z]|${ nonAsciiPattern }|${ escapePattern })`,
 		nmcharPattern = `(?:[_a-z0-9-]|${ nonAsciiPattern }|${ escapePattern })`,
 		identPattern = '-?' + nmstartPattern + nmcharPattern + '*',
-		stringPattern = `(?:"(?:[^\\\"\n]|${ escapePattern }|\\\n)*"|'(?:[^\\\'\n]|${ escapePattern }|\\\n)*')`,
-		quantPattern = `(?:[-+]?${ numPattern }(?:\\s*${ unitPattern }|${ identPattern })?|-?${ calcPattern })`,
-		posQuantPattern = `(?:\\+?${ numPattern }(?:\\s*${ unitPattern }|${ identPattern })?|${ calcPattern })`,
+		// Escaping breakdown: \\\\\n (code input) -> '\\\n' (string) -> /\\\n/ (regex) -> [\] [\n] (actual characters)
+		stringPattern = `(?:"(?:[^\\\\\n\"]|${ escapePattern }|\\\\\n)*"|\'(?:[^\\\\\n\']|${ escapePattern }|\\\\\n)*\')`,
+		quantPattern = `(?:[-+]?${ numPattern }(?:\\s*${ unitPattern }|${ identPattern })?|-?${ calcToken })`,
+		posQuantPattern = `(?:\\+?${ numPattern }(?:\\s*${ unitPattern }|${ identPattern })?|${ calcToken })`,
 		signedQuantPattern = `(${ quantPattern }|inherit|auto)`,
 		colorPattern = '(?:' +
 			// "rgb( 255, 255, 255 )"
@@ -141,21 +150,17 @@ function CSSJanus() {
 			// "#FF0000"
 			`|#${ nmcharPattern }+` +
 		')',
-		urlCharsPattern = `(?:${ urlSpecialCharsPattern }|${ nonAsciiPattern }|${ escapePattern })*`,
+		urlCharsPattern = `(?:${ escapePattern }|${ urlSpecialCharsPattern }|${ nonAsciiPattern })*`,
 		urlPattern = `url\\(${ _ }(?:${ stringPattern }|${ urlCharsPattern })${ _ }\\)`,
 		sidesPattern = 'top|right|bottom|left',
 		edgesPattern = `(?:${ sidesPattern }|center)`,
 		lookAheadNotLetterPattern = '(?![a-zA-Z])',
-		lookAheadNotOpenBracePattern = `(?!(${ nmcharPattern }|\\r?\\n|\\s|#|\\:|\\.|\\,|\\+|>|\\(|\\)|\\[|\\]|\\*|=|~=|\\^=|\\$=|\\||${ stringPattern }|${ commentToken })*?{)`,
+		lookAheadNotOpenBracePattern = `(?!(${ nmcharPattern }|${ ws }|\\r?\\n|#|\\:|\\.|\\,|\\+|>|~|\\(|\\)|\\[|\\]|\\*|=|~=|\\^=|\\$=|\\||${ stringPattern }|${ stringToken })*?{)`,
 		lookAheadNotClosingParenPattern = `(?!${ urlCharsPattern }?${ validAfterUriCharsPattern }\\))`,
-		lookAheadForClosingParenPattern = `(?=${ urlCharsPattern }?${ validAfterUriCharsPattern }\\))`,
 		suffixPattern = `(${ _ }(?:!important${ _ })?[;}])`,
-		anglePattern = `(?:([-+]?${ numPattern })((?:deg|g?rad|turn)?))`,
-		colorStopsPattern = `${ colorPattern }(?:${ ws + quantPattern })?` +
-			`(?:${ comma + colorPattern }(?:${ ws + quantPattern })?)+`,
 		// Regular expressions
 		commentRegExp = new RegExp( commentPattern, 'gi' ),
-		charsWithinSelectorPattern = `(?:${ urlPattern }|${ stringPattern }|[^\\}])*?`,
+		charsWithinSelectorPattern = `(?:${ urlPattern }|${ escapePattern }|${ stringPattern }|[^\\}])*?`,
 		noFlipSingleRegExp = new RegExp( `(${ noFlipPattern + lookAheadNotOpenBracePattern }(${ urlPattern }|[^;}])+;?)`, 'gi' ),
 		noFlipClassRegExp = new RegExp( `(${ noFlipPattern + charsWithinSelectorPattern }})`, 'gi' ),
 		directionRegExp = new RegExp( `(${ directionPattern })(ltr|rtl)${ lookAheadNotLetterPattern }`, 'gi' ),
@@ -168,8 +173,8 @@ function CSSJanus() {
 			')?' +
 			`(${ sidesPattern })` +
 			lookAheadNotLetterPattern + lookAheadNotClosingParenPattern + lookAheadNotOpenBracePattern, 'gi' ),
-		edgeInUrlRegExp = new RegExp( nonLetterPattern + '(' + sidesPattern + ')' + lookAheadNotLetterPattern + lookAheadForClosingParenPattern, 'gi' ),
-		dirInUrlRegExp = new RegExp( nonLetterPattern + '(ltr|rtl|(?:tb|bt|vertical)-(?:lr|rl|inline)|(?:lr|rl|horizontal)-(?:tb|bt|inline))' + lookAheadNotLetterPattern + lookAheadForClosingParenPattern, 'gi' ),
+		plainSidesRegExp = new RegExp( nonLetterPattern + `(${ sidesPattern })` + lookAheadNotLetterPattern, 'gi' ),
+		dirInUrlRegExp = new RegExp( nonLetterPattern + '(ltr|rtl|(?:tb|bt|vertical)-(?:lr|rl|inline)|(?:lr|rl|horizontal)-(?:tb|bt|inline))' + lookAheadNotLetterPattern, 'gi' ),
 		cursorRegExp = new RegExp( `(cursor${ colon })(?:([ns])?([ew])?-resize|((?:row|col|ns|ew|nesw|nwse)-resize|text|vertical-text))`, 'gi' ),
 		fourNotationGroups = ( () => {
 			const group = {
@@ -186,10 +191,11 @@ function CSSJanus() {
 		} )(),
 		quantPlainUnitRegex = new RegExp( '[-+]?' + numPattern + unitPattern, 'gi' ),
 		// Background-positions.
-		bgRegExp = new RegExp( `(background(?:-position)?)(${ colon })((?:${ urlPattern }|[^;{}])+)`, 'gi' ),
-		bgXYRegExp = new RegExp( `(background-position-[xy])(?:(${ colon })([^;{}]+)${ suffixPattern })?`, 'gi' ),
+		bgRegExp = new RegExp( `(background(?:-position)?)(${ colon })((?:[^;{}])+)`, 'gi' ),
+		bgXYRegExp = new RegExp( `(background-position-[xy])(?:(${ colon })([^;{}]+)${ suffixPattern })?` +
+			lookAheadNotClosingParenPattern + lookAheadNotOpenBracePattern, 'gi' ),
 		positionValuesRegExp = new RegExp(
-			'(^|\\s|,)' +
+			`(^|${ ws }|,)` +
 			// First-dimension position.
 			`((${ edgesPattern }(?:${ ws + quantPattern }(?=${ ws + edgesPattern }))?)|${ quantPattern })` +
 			// Second-dimension position.
@@ -198,7 +204,7 @@ function CSSJanus() {
 			'(?![^()]*\\))' +
 			lookAheadNotClosingParenPattern, 'gi' ),
 		bgPositionSingleValueRegExp = new RegExp(
-			'(^|\\s|,)' +
+			`(^|${ ws }|,)` +
 			`([-+]?${ numPattern }%)` +
 			lookAheadNotClosingParenPattern, 'gi' ),
 		bgRepeatRegExp = new RegExp( `(background-repeat${ colon })([A-z-, ]+)` + suffixPattern, 'gi' ),
@@ -206,19 +212,23 @@ function CSSJanus() {
 		bgSizeRegExp = new RegExp( `(background-size${ colon })([^;{}]+)`, 'gi' ),
 		twoQuantsRegExp = new RegExp( `(auto|${ posQuantPattern })(?:${ sws }(auto|${ posQuantPattern }))?`, 'gi' ),
 		linearGradientRegExp = new RegExp(
-			`((?:repeating-)?linear-gradient\\(${ _ })` +
-			`(?:${ anglePattern }(${ comma }))?` +
-			`(${ colorStopsPattern + _ }\\))`,
+			`(^(?:repeating-)?linear-gradient\\(${ _ })` +
+			`(?:([-+]?${ numPattern })((?:deg|g?rad|turn)?)|(?!${ _ }(?:to${ ws }|${ calcToken })))`,
+			'gi'
+		),
+		cornerRegExp = new RegExp(
+			`(${ sidesPattern })${ sws }(${ sidesPattern })`,
 			'gi'
 		),
 		radialGradientRegExp = new RegExp(
-			`((?:repeating-)?radial-gradient\\(${ _ })` +
+			'(^(?:repeating-)?radial-gradient\\()' +
+			// Shape and size/extent
 			`((?:${ _ }(?:(?:closest|farthest)-(?:corner|side)|circle|ellipse|${ posQuantPattern })(?=\\s|,))*)` +
-			`(${ ws }at(?:${ ws }(?:${ edgesPattern }|${ quantPattern })){1,4})?` + // positon
-			`(${ comma + colorStopsPattern + _ }\\))`,
+			// Position
+			`(${ _ }at(?:${ ws }(?:${ edgesPattern }|${ quantPattern })){1,4})?`,
 			'gi'
 		),
-		borderImageRegExp = new RegExp( `(border-image(?:-slice)?${ colon }[^;}]*?)` +
+		borderImageRegExp = new RegExp( `(border-image(?:-slice)?${ colon }(?:${ fnToken }|${ ws }|[^;}])*?)` +
 			`${ signedQuantPattern }(?:(${ ws }(?:fill${ ws })?)${ signedQuantPattern }(?:(${ ws }(?:fill${ ws })?)${ signedQuantPattern }(?:(${ ws }(?:fill${ ws })?)${ signedQuantPattern })?)?)?` +
 			`(?:((?:${ ws }fill)?${ slash })(?:${ signedQuantPattern }(?:${ sws + signedQuantPattern }(?:${ sws + signedQuantPattern }(?:${ sws + signedQuantPattern })?)?)?)?` +
 				`(?:(${ slash })(?:${ signedQuantPattern }(?:${ sws + signedQuantPattern }(?:${ sws + signedQuantPattern }(?:${ sws + signedQuantPattern })?)?)?)?)?` +
@@ -240,9 +250,13 @@ function CSSJanus() {
 		transformRegExp = new RegExp( `(transform${ colon })([^;{}]+)` + suffixPattern, 'gi' ),
 		transformFunctionRegExp = new RegExp( `((?:rotate|translate|skew|scale|matrix)(?:x|y|z|3d)?)(\\(${ _ })([^\\)]*?)(${ _ }\\))`, 'gi' ),
 		transformOriginRegExp = new RegExp( `(transform-origin${ colon })` +
+			// Are the origin dimensions reversed, Y X instead of X Y?
 			`(?=((?:top|bottom)${ ws + quantPattern }|${ quantPattern + ws }(?:left|right))?)` +
+			// If the two values are swapped (because we're switching between horizontal and vertical), will it be Y X?
 			`(?=((?:left|right)${ ws + quantPattern }|${ quantPattern + ws }(?:top|bottom))?)` +
-			`(${ edgesPattern }(?=${ ws + quantPattern })|${ quantPattern })` +
+			// First value. (If there's just a single edge value, don't match. No extra transformation necessary.)
+			`(${ edgesPattern }(?=${ ws }(?:${ edgesPattern }|${ quantPattern }))|${ quantPattern })` +
+			// Whitespace and second value (which can be either X or Y).
 			`(?:${ sws }(${ edgesPattern }|${ quantPattern }))?`, 'gi' ),
 		perspectiveOriginRegExp = new RegExp( `(perspective-origin${ colon })([^;{}]+)`, 'gi' ),
 		sizeRegExp = new RegExp( '(max-|min-|[^-a-z])(height|width)' + lookAheadNotLetterPattern + lookAheadNotClosingParenPattern + lookAheadNotOpenBracePattern, 'gi' ),
@@ -478,7 +492,7 @@ function CSSJanus() {
 				noFlipSingleTokenizer,
 				noFlipClassTokenizer,
 				commentTokenizer,
-				calcTokenizer,
+				fnAndStringTokenizer,
 				swapText,
 				// Default values
 				sourceDir = options.sourceDir || 'lr-tb',
@@ -597,11 +611,11 @@ function CSSJanus() {
 								yPos = space1 = '';
 							}
 						} else {
-							if ( !yEdge && ( map[ 2 ] === 0 || map[ 1 ] === 0 ) ) {
+							if ( !yEdge && flipY ) {
 								yPos = flipPositionValue( yPos );
 							}
 						}
-						if ( !xEdge && ( map[ 3 ] === 1 || map[ 0 ] === 1 ) ) {
+						if ( !xEdge && flipX ) {
 							xPos = flipPositionValue( xPos );
 						}
 					}
@@ -622,61 +636,210 @@ function CSSJanus() {
 
 			// Tokenize
 
-			// calc() is more complicated than comments, because they can be
-			// nested, which can't be handled by normal regular expressions.
-			calcTokenizer = ( function ( token ) {
-				const matches = [];
+			// Tokenize functions and strings, transforming image urls and gradients.
+			//
+			// Certain CSS functions, such as calc(), are too complicated to be
+			// handled by just regular expressions, because they can be nested.
+			//
+			// Strings also require context-dependent processing, and are transformed
+			// only when in an image-url function such as url() or image-set().
+			fnAndStringTokenizer = ( function () {
+				const matches = [],
+					// To detokenize: Match any of the tokens, capturing index. For calc()s,
+					// also check if there's a preceding negative sign in case the token
+					// has been flipped.
+					deTokenizeRegex = new RegExp( '(?:' +
+						[ fnToken, stringToken, '(-)?' + calcToken ].map( function ( token ) {
+							return token.split( /\\d\+/ )[ 0 ];
+						} ).join( '|' ) + ')(\\d+)`', 'g' );
 
 				return {
 					tokenize: function ( css ) {
-						const regex = /(?=((?:-moz-|-webkit-)?calc\())/gi;
+						const regex = new RegExp(
+								// Skip escaped quotes/brackets
+								'(\\\\[\\\\"\'()])|' +
+								// Tokenize strings, urls.
+								'(?=(' +
+									'(' + stringPattern + ')|' +
+									'url\\(' + _ + urlCharsPattern + _ + '(\\))' +
+								'))|' +
+								// Begin function/brackets set
+								'(?:-moz-|-webkit-)?(?:' +
+									'(?:repeating-)?(?:(linear)|(radial))-(gradient)|' +
+									'(url|image(?:-set)|cross-fade)|' +
+									'(calc)' +
+								')?\\(|' +
+								// End function/brackets set
+								'(\\))', 'gi' ),
+							// Names of the regex capture groups.
+							types = {
+								SKIP: 1,
+								CAPTUREFULLGROUP: 2,
+								STRING: 3,
+								COMPLETEURL: 4,
+								LINEAR: 5,
+								RADIAL: 6,
+								GRADIENT: 7,
+								IMGFN: 8,
+								CALC: 9,
+								CLOSEBRACKET: 10
+							},
+							// Stack
+							brackets = [];
 
-						for ( let lastCalc; ( lastCalc = regex.exec( css ) ); ) {
-							let calcIndex = lastCalc.index,
-								lastBracket = calcIndex + lastCalc[ 1 ].length;
-							for ( let depth = 1; depth > 0; ) {
-								let nextOpen = css.indexOf( '(', lastBracket ),
-									nextClose = css.indexOf( ')', lastBracket );
-								if ( nextOpen !== -1 && nextOpen < nextClose ) {
-									lastBracket = nextOpen + 1;
-									depth++;
-								} else if ( nextClose !== -1 ) {
-									lastBracket = nextClose + 1;
-									depth--;
+						// Transform a linear-gradient's angle.
+						function transformLinearGradient( angleQuant, angleUnitText ) {
+							var angleIsDefined = angleQuant !== undefined,
+								angleQuantFloat = parseFloat( angleQuant || 180 ),
+								angleQuantResult,
+								angleUnit = angleUnitText || 'deg',
+								angleText = '',
+								max = angleMaxes[ angleUnit ],
+								addedRotation = map[ 0 ] * max / 4,
+								precision;
+
+							if ( angleIsDefined && angleQuantFloat !== 0 && angleUnitText === '' ) {
+								// Invalid angle, non-zero number with no unit given.
+								return angleQuant + angleUnitText;
+							}
+
+							precision = Math.max( getPrecision( angleQuant || '0' ), getPrecision( addedRotation ) );
+							angleQuantResult = ( max + ( reflected ? 1 : -1 ) * ( addedRotation - angleQuantFloat ) ) % max;
+
+							if ( angleQuantResult === angleQuantFloat % max ) {
+								// No change, use original text.
+								return angleIsDefined ? angleQuant + angleUnitText : '';
+							}
+
+							// If no angle given, and no necessary angle change, leave unchanged.
+							if ( angleIsDefined || angleQuantResult !== 180 ) {
+								angleText = angleQuantResult.toFixed( precision ) +
+									( angleQuantResult === 0 ? angleUnitText : angleUnit ) +
+									( angleIsDefined ? '' : ', ' );
+							}
+
+							return angleText;
+						}
+
+						// Transform a radial gradient's size/extent and position.
+						function transformRadialGradient( shape, position ) {
+
+							if ( shape.indexOf( 'circle' ) === -1 && quarterTurned ) {
+								// Swap X and Y sizes.
+								shape = shape.replace( twoQuantsRegExp, '$3$2$1' );
+							}
+
+							position = position ? positionFormat( position ) : '';
+
+							return shape + position;
+						}
+
+						function transformUrl( url ) {
+							// Transform directional keywords in URLs, depending on settings given.
+							if ( options.transformDirInUrl ) {
+								// Transform directions ("ltr") and writing-modes ("horizontal-tb") in image URLs.
+								url = replace( url, dirInUrlRegExp, dir => {
+									// Valid directions:
+									//   ltr, rtl, tb-lr, tb-rl, lr-tb, lr-bt, rl-tb, rl-bt, bt-lr, bt-rl
+									//   horizontal-tb, horizontal-bt, vertical-lr, vertical-rl,
+									//   tb-inline, bt-inline, lr-inline, rl-inline, horizontal-inline, vertical-inline,
+
+									return dir.split( '-' ).map( swapText ).join( '-' );
+								} );
+							}
+							if ( options.transformEdgeInUrl ) {
+								// Replace 'left', 'top', 'right', and 'bottom' with the appropriate side in image URLs
+								url = replace( url, plainSidesRegExp, swapText );
+							}
+							return url;
+						}
+
+						function tokenizeRange( start, end, match, token ) {
+							css = css.substring( 0, start ) +
+								// Record the index in the token in case it gets moved around.
+								token.replace( /\\d\+/, matches.push( match ) - 1 ) +
+								css.substring( end );
+						}
+
+						for ( let next; ( next = regex.exec( css ) ); ) {
+							const index = next.index;
+
+							if ( next[ types.SKIP ] ) {
+								// Just passing an escaped quote or slash character. Do nothing.
+							} else if ( !next[ types.CLOSEBRACKET ] ) {
+								// Open bracket/function, or string
+								let match = next[ types.CAPTUREFULLGROUP ];
+								if ( match ) {
+									// Self-contained token: url( ... ) or string
+									const open = brackets[ brackets.length - 1 ],
+										endIndex = index + match.length;
+
+									if ( next[ types.COMPLETEURL ] || open && open[ types.IMGFN ] ) {
+										// Either url(), or string inside a function that takes strings as urls.
+										match = transformUrl( match );
+									}
+									tokenizeRange( index, endIndex, match, next[ types.STRING ] ? stringToken : fnToken );
 								} else {
-									// Unclosed calc(). Abort.
-									//
-									// According to both the spec and current practice, this is
-									// basically supposed to consume the entire rest of the CSS file.
-									// However, to minimize damage in case this is a parsing error,
-									// we're just going to tokenize the calc keyword itself.
-									lastBracket = css.length;
-									break;
+									// Open a function or bracket set, to be transformed/tokenized at the close if necessary.
+									brackets.push( next );
+								}
+							} else {
+								// Close a function or bracket set.
+
+								// Get matching open-bracket, including index and associated function type.
+								const open = brackets.pop();
+
+								if ( open && ( open[ types.GRADIENT ] || open[ types.CALC ] || open[ types.IMGFN ] ) ) {
+									let match = css.substring( open.index, index + 1 );
+
+									if ( open[ types.GRADIENT ] ) {
+										// Transform gradients
+										match = replace( match, plainSidesRegExp, swapText );
+										if ( open[ types.LINEAR ] ) {
+											if ( quarterTurned ) {
+												match = match.replace( cornerRegExp, '$3$2$1' );
+											}
+											match = replace( match, linearGradientRegExp, transformLinearGradient );
+										} else {
+											match = replace( match, radialGradientRegExp, transformRadialGradient );
+										}
+									}
+
+									tokenizeRange( open.index, index + 1, match, open[ types.CALC ] ? calcToken : fnToken );
+
+									// Reset the index to the start of the matched token, to avoid
+									// skipping content.
+									regex.lastIndex = open.index;
 								}
 							}
-							css = css.substring( 0, calcIndex ) +
-								// Tokenize the calc(), recording it's index in the token.
-								// This is necessary because calcs may be moved around.
-								token.replace( /\$1/, matches.push( css.substring( calcIndex, lastBracket ) ) - 1 ) +
-								css.substring( lastBracket );
+						}
+
+						for ( ; brackets.pop(); ) {
+							// Unclosed function. Don't tokenize.
+							//
+							// According to both the spec and current practice, this is
+							// basically supposed to consume the entire rest of the CSS file.
+							// However, to minimize damage in case this is a parsing error,
+							// we're going to ignore that.
 						}
 						return css;
 					},
-					detokenize: function ( str ) {
-						const regex = new RegExp( '(-?)' + token.replace( /\$1/, '(\\d+)' ), 'g' );
-						return str.replace( regex, function ( match, negative, index ) {
-							let calc = matches[ index ];
+					detokenize: function deTokenize( str ) {
+						return str.replace( deTokenizeRegex, function ( match, negative, index ) {
+							let text = matches[ index ];
 							if ( negative ) {
-								// Flip all values with units.
-								calc = calc.replace( quantPlainUnitRegex, flipSign );
+								// This is a calc() function that's been flipped ("x" -> "-x").
+								// Flip all values with units: 2 * 2px -> 2 * -2px
+								text = text.replace( quantPlainUnitRegex, flipSign );
 							}
-							return calc;
+							return deTokenize( text );
 						} );
 					}
 				};
-			}( calcToken ) );
 
-			css = calcTokenizer.tokenize(
+			}() );
+
+			css = fnAndStringTokenizer.tokenize(
 				commentTokenizer.tokenize(
 					noFlipClassTokenizer.tokenize(
 						noFlipSingleTokenizer.tokenize(
@@ -689,22 +852,6 @@ function CSSJanus() {
 				)
 			);
 
-			// Transform URLs
-			if ( options.transformDirInUrl ) {
-				// Transform directions and writing-modes in background URLs.
-				css = replace( css, dirInUrlRegExp, dir => {
-					// Valid directions:
-					//   ltr, rtl, tb-lr, tb-rl, lr-tb, lr-bt, rl-tb, rl-bt, bt-lr, bt-rl
-					//   horizontal-tb, horizontal-bt, vertical-lr, vertical-rl,
-					//   tb-inline, bt-inline, lr-inline, rl-inline, horizontal-inline, vertical-inline,
-					return dir.split( '-' ).map( swapText ).join( '-' );
-				} );
-			}
-			if ( options.transformEdgeInUrl ) {
-				// Replace 'left', 'top', 'right', and 'bottom' with the appropriate side in background URLs
-				css = replace( css, edgeInUrlRegExp, swapText );
-			}
-
 			// Transform rules
 			css = replace( css, [
 				// Flip rules like left: , padding-right: , etc.
@@ -715,7 +862,7 @@ function CSSJanus() {
 						// * caption-side is writing-mode-relative, and shouldn't ever be
 						//   rotated or flipped. suppressChange = true
 						// * float: left/right works by direction, not writing mode. It can
-						//   be flipped between left and right, but never rotated.
+						//   be flipped between left and right, but never rotated. dontRotate = true
 						dontRotate +
 							( !suppressChange && dirFlipped && ( { right: 'left', left: 'right' }[ side.toLowerCase() ] ) || side ) :
 						// Normal sides. Rotate/flip as applicable.
@@ -733,12 +880,14 @@ function CSSJanus() {
 				// Border radius
 				[ borderRadiusRegExp, function () {
 					const preSlash = processFourNotationArray( cornersMap, [].slice.call( arguments, 0, 7 ), cornersFlipped ),
+						slash = arguments[ 7 ] || '',
 						postSlash = processFourNotationArray( cornersMap, [].slice.call( arguments, 8, 15 ), cornersFlipped );
-					return ( quarterTurned ? postSlash + ( arguments[ 7 ] || '' ) + preSlash : preSlash + ( arguments[ 7 ] || '' ) + postSlash ) +
+					return ( quarterTurned ? postSlash + slash + preSlash : preSlash + slash + postSlash ) +
 						( arguments[ 15 ] || '' );
 				} ],
 				// Shadows
 				[ shadowRegExp, value =>
+					// Process each shadow individually.
 					replace( value, shadowValueRegExp, ( X, space, Y, end ) =>
 						flipXYPositions( map[ 1 ], X, Y ) + space + flipXYPositions( map[ 2 ], X, Y ) + end
 					)
@@ -747,41 +896,6 @@ function CSSJanus() {
 				// like padding: 1px 2px 3px 4px;
 				[ fourNotationGroups, function ( q1, s1, q2, s2, q3, s3, q4, s4 ) {
 					return processFourNotationArray( map, [].slice.call( arguments, 0, 7 ), quarterTurned ) + s4;
-				} ],
-				// Background gradients.
-				[ linearGradientRegExp, ( angleQuant, angleUnitText, space, post ) => {
-					var angleQuantFloat = parseFloat( angleQuant || 180 ),
-						angleUnit = angleUnitText || 'deg',
-						angleText = '',
-						max = angleMaxes[ angleUnit ],
-						addedRotation = map[ 0 ] * max / 4,
-						precision;
-
-					if ( angleQuantFloat === 0 && angleUnitText ) {
-						// Invalid angle.
-						return angleQuant + angleUnitText + space + post;
-					}
-
-					precision = Math.max( getPrecision( angleQuant || '0' ), getPrecision( addedRotation ) );
-					angleQuant = ( max + ( reflected ? 1 : -1 ) * ( addedRotation - angleQuantFloat ) ) % max;
-
-					// If no angle given, and no necessary angle change, leave unchanged.
-					if ( space || angleQuant !== 180 ) {
-						angleText = angleQuant.toFixed( precision ) + ( angleQuant === 0 ? angleUnitText : angleUnit ) + ( space || ', ' );
-					}
-
-					return angleText + post;
-				} ],
-				[ radialGradientRegExp, function ( shape, position, post ) {
-
-					if ( shape.indexOf( 'ellipse' ) !== -1 && quarterTurned ) {
-						// Swap X and Y sizes.
-						shape = shape.replace( twoQuantsRegExp, '$3$2$1' );
-					}
-
-					position = position ? positionFormat( position ) : '';
-
-					return shape + position + post;
 				} ],
 				// Border images
 				[ borderImageRegExp, function () {
@@ -928,25 +1042,25 @@ function CSSJanus() {
 					) + suffix;
 				} ],
 				[ transformOriginRegExp, function ( reverseOrder, reverseOrderQT, v1, space, v2 ) {
-					var isReverseOrder = quarterTurned ? reverseOrderQT : reverseOrder,
-						x = isReverseOrder ? v2 : v1,
-						y = isReverseOrder ? v1 : v2;
+					const isReverseOrder = quarterTurned ? reverseOrderQT : reverseOrder,
+						toFlipV1 = isReverseOrder ? flipY : flipX,
+						toFlipV2 = isReverseOrder ? flipX : flipY;
 
-					if ( flipX ) {
-						x = flipPositionValue( x );
+					if ( toFlipV1 ) {
+						v1 = flipPositionValue( v1 );
 					}
-					if ( flipY && y ) {
-						y = flipPositionValue( y );
+					if ( toFlipV2 && v2 ) {
+						v2 = flipPositionValue( v2 );
 					}
+
 					if ( quarterTurned ) {
-						let temp = y;
-						y = x;
-						x = temp;
+						let temp = v2 || 'center';
+						v2 = v1;
+						v1 = temp;
 					}
-
-					return ( isReverseOrder ?
-						( y ? y + space : 'center ' ) + x :
-						( x ? x + ( y ? space + y : '' ) : 'center ' + y )
+					return ( ( v1 && v2 ) ?
+						v1 + ( space || ' ' ) + v2 :
+						( v1 || v2 )
 					);
 				} ],
 				[ perspectiveOriginRegExp, positionFormat ],
@@ -1021,7 +1135,7 @@ function CSSJanus() {
 			css = noFlipSingleTokenizer.detokenize(
 				noFlipClassTokenizer.detokenize(
 					commentTokenizer.detokenize(
-						calcTokenizer.detokenize( css )
+						fnAndStringTokenizer.detokenize( css )
 					)
 				)
 			);
